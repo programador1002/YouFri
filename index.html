@@ -24,8 +24,8 @@
     <button id="btn-cargar-mas" style="display: block; margin: 20px auto; padding: 10px 20px; background-color: #000; color: #fff; border: none; border-radius: 20px; cursor: pointer;">Cargar más cómics</button>
     <script type="module">
        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-// Se agregó limit aquí
-import { getFirestore, collection, addDoc, getDocs, orderBy, query, doc, deleteDoc, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// Agregamos startAfter para saber desde dónde continuar cargando
+import { getFirestore, collection, addDoc, getDocs, orderBy, query, doc, deleteDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDZ2lPeBSmQx4h1UBglIE2Ake8JBHsD0yU",
@@ -38,6 +38,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Variables para controlar la paginación
+let ultimoDoc = null; 
 
 // FORMULARIO MANUAL
 document.getElementById('formulario-comic').addEventListener('submit', async (e) => {
@@ -60,41 +63,83 @@ document.getElementById('formulario-comic').addEventListener('submit', async (e)
         });
         alert("¡Cómic publicado!");
         document.getElementById('formulario-comic').reset();
+        // Al publicar uno nuevo, reiniciamos la lista para ver el más reciente arriba
+        ultimoDoc = null;
+        document.getElementById('contenedor-comics').innerHTML = "";
         mostrarComics();
     } catch (error) {
         console.error("Error al guardar: ", error);
     }
 });
 
-// FUNCIÓN MOSTRAR COMICS CORREGIDA CON LÍMITE DE 20
+// FUNCIÓN PARA CARGAR LOS PRIMEROS 20 CÓMICS
 async function mostrarComics() {
     const contenedor = document.getElementById('contenedor-comics');
     if (!contenedor) return;
 
     try {
-        // Aquí se aplica el limit(20)
         const q = query(collection(db, "comics"), orderBy("fecha", "desc"), limit(20));
         const querySnapshot = await getDocs(q);
         contenedor.innerHTML = "";
 
-        querySnapshot.forEach((docSnap) => {
-            const datos = docSnap.data();
-            const idDoc = docSnap.id; 
+        // Guardamos el último documento de esta tanda de 20
+        ultimoDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
 
-            contenedor.innerHTML += `
-                <div class="card-comic" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; max-width: 300px; display: inline-block; margin-right: 15px; vertical-align: top;">
-                    <img src="${datos.imagenUrl}" alt="Portada" style="max-width: 100%; height: auto; border-radius: 4px;">
-                    <h3>${datos.titulo}</h3>
-                    <p><strong>Por:</strong> ${datos.autor}</p>
-                    <p>${datos.sinopsis}</p>
-                    <button onclick="eliminarComic('${idDoc}', '${datos.password}')" style="background-color: red; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 5px 10px; margin-top: 10px; width: 100%;">Eliminar</button>
-                </div>
-            `;
+        querySnapshot.forEach((docSnap) => {
+            dibujarTarjeta(docSnap);
         });
     } catch (error) {
         console.error("Error al cargar: ", error);
     }
 }
+
+// FUNCIÓN PARA CARGAR LOS SIGUIENTES 20 CÓMICS (BOTÓN)
+async function cargarMasComics() {
+    if (!ultimoDoc) {
+        alert("¡Ya no hay más cómics que cargar!");
+        return;
+    }
+
+    try {
+        // Usamos startAfter para cargar a partir del último que ya vimos
+        const q = query(collection(db, "comics"), orderBy("fecha", "desc"), startAfter(ultimoDoc), limit(20));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            alert("¡Llegaste al final del lore de YouFri!");
+            return;
+        }
+
+        // Actualizamos el último documento con el de la nueva tanda
+        ultimoDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+
+        querySnapshot.forEach((docSnap) => {
+            dibujarTarjeta(docSnap);
+        });
+    } catch (error) {
+        console.error("Error al cargar más: ", error);
+    }
+}
+
+// FUNCIÓN AUXILIAR PARA DIBUJAR LA TARJETA EN EL HTML
+function dibujarTarjeta(docSnap) {
+    const contenedor = document.getElementById('contenedor-comics');
+    const datos = docSnap.data();
+    const idDoc = docSnap.id; 
+
+    contenedor.innerHTML += `
+        <div class="card-comic" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; max-width: 300px; display: inline-block; margin-right: 15px; vertical-align: top;">
+            <img src="${datos.imagenUrl}" alt="Portada" style="max-width: 100%; height: auto; border-radius: 4px;">
+            <h3>${datos.titulo}</h3>
+            <p><strong>Por:</strong> ${datos.autor}</p>
+            <p>${datos.sinopsis}</p>
+            <button onclick="eliminarComic('${idDoc}', '${datos.password}')" style="background-color: red; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 5px 10px; margin-top: 10px; width: 100%;">Eliminar</button>
+        </div>
+    `;
+}
+
+// ASIGNAR EVENTO AL BOTÓN DE CARGAR MÁS
+document.getElementById('btn-cargar-mas').addEventListener('click', cargarMasComics);
 
 // Ejecuta la función al cargar la página
 mostrarComics();
@@ -113,7 +158,10 @@ document.getElementById('cheese').addEventListener('click', async (e) => {
             fecha: new Date()
         });
         alert("¡Se publicó un Queso automáticamente! 🧀");
-        mostrarComics();
+        ultimoDoc = null;
+        document.getElementById('contenedor-comics').innerHTML = "";
+        mostrarComics(); 
+    } catch (error) {
     </script>
 </body>
 <style>
