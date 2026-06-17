@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouFri</title>
+</head>
+<h2>YouFri</h2>
+<p>Comic que no hay No hay lore.</p>
+<hr>
+
+<body>
+    <form id="formulario-comic">
+        <input id="titulo" type="text" placeholder="Titulo">
+        <input type="text" id="autor" placeholder="Autor">
+        <textarea name="" id="sinopsis" placeholder="Cuerpo"></textarea>
+        <input type="text" id="ImagenURI" placeholder="Imagen">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button type="submit" class="pub">Publicar Comic</button>
+    </form>
+
+    <div id="contenedor-comics" class="comics"></div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, orderBy, query, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZ2lPeBSmQx4h1UBglIE2Ake8JBHsD0yU",
+            authDomain: "youfri-a016f.firebaseapp.com",
+            projectId: "youfri-a016f",
+            storageBucket: "youfri-a016f.firebasestorage.app",
+            messagingSenderId: "197362593914",
+            appId: "1:197362593914:web:b38eb22895a3a9943e0bc3"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // FORMULARIO MANUAL
+        document.getElementById('formulario-comic').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const titulo = document.getElementById('titulo').value;
+            const autor = document.getElementById('autor').value;
+            const sinopsis = document.getElementById('sinopsis').value;
+            const imagenUrl = document.getElementById('ImagenURI').value;
+            const password = document.getElementById('password').value; // <-- CAPTURA LA CONTRASEÑA DEL INPUT
+
+            try {
+                await addDoc(collection(db, "comics"), {
+                    titulo,
+                    autor,
+                    sinopsis,
+                    imagenUrl,
+                    password, // <-- GUARDA LA CONTRASEÑA EN FIREBASE
+                    fecha: new Date()
+                });
+                alert("¡Cómic publicado!");
+                document.getElementById('formulario-comic').reset();
+                mostrarComics();
+            } catch (error) {
+                console.error("Error al guardar: ", error);
+            }
+        });
+
+        // UNA SOLA FUNCIÓN MOSTRAR COMICS LIMPIA Y CORREGIDA
+        async function mostrarComics() {
+            const contenedor = document.getElementById('contenedor-comics');
+            if (!contenedor) return;
+
+            try {
+                const q = query(collection(db, "comics"), orderBy("fecha", "desc"));
+                const querySnapshot = await getDocs(q);
+                contenedor.innerHTML = "";
+
+                querySnapshot.forEach((docSnap) => {
+                    const datos = docSnap.data();
+                    const idDoc = docSnap.id; // Captura el ID único para poder borrarlo
+
+                    contenedor.innerHTML += `
+                        <div class="card-comic" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; max-width: 300px; display: inline-block; margin-right: 15px; vertical-align: top;">
+                            <img src="${datos.imagenUrl}" alt="Portada" style="max-width: 100%; height: auto; border-radius: 4px;">
+                            <h3>${datos.titulo}</h3>
+                            <p><strong>Por:</strong> ${datos.autor}</p>
+                            <p>${datos.sinopsis}</p>
+                            <button onclick="eliminarComic('${idDoc}', '${datos.password}')" style="background-color: red; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 5px 10px; margin-top: 10px; width: 100%;">Eliminar</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error("Error al cargar: ", error);
+            }
+        }
+
+        // Ejecuta la función al cargar la página
+        mostrarComics();
+
+        // LÓGICA AUTOMÁTICA PARA EL BOTÓN DE QUESO
+        document.getElementById('cheese').addEventListener('click', async (e) => {
+            e.preventDefault(); 
+
+            try {
+                await addDoc(collection(db, "comics"), {
+                    titulo: "Queso",
+                    autor: "Bot Quesero",
+                    sinopsis: "queso",
+                    imagenUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8d/Emmental_cheese_on_white_background.jpg",
+                    password: "admin", // Contraseña por defecto para el queso rápido
+                    fecha: new Date()
+                });
+                alert("¡Se publicó un Queso automáticamente! 🧀");
+                mostrarComics(); 
+            } catch (error) {
+                console.error("Error al publicar queso: ", error);
+            }
+        });
+
+        // FUNCIÓN GLOBAL PARA ELIMINAR EL CÓMIC CON CONTRASEÑA
+        window.eliminarComic = async function (id, passwordCorrecto) {
+            // Si el cómic es viejo y no tiene contraseña, usa "admin" por defecto
+            const passReal = passwordCorrecto && passwordCorrecto !== "undefined" ? passwordCorrecto : "admin";
+            
+            const passUsuario = prompt("Introduce la contraseña para eliminar este cómic:");
+
+            if (passUsuario === null) return; // Si el usuario cancela, no hace nada
+
+            if (passUsuario === passReal) {
+                try {
+                    await deleteDoc(doc(db, "comics", id));
+                    alert("¡Cómic eliminado correctamente! 🗑️");
+                    mostrarComics(); // Recarga la pantalla
+                } catch (error) {
+                    console.error("Error al eliminar: ", error);
+                }
+            } else {
+                alert("❌ Contraseña incorrecta. No puedes borrar este cómic.");
+            }
+        };
+    </script>
+</body>
+<style>
+    body {
+        background-color: rgb(255, 255, 255);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border-bottom: 15px;
+        border-radius: 35px;
+    }
+
+    html {
+        background-color: rgb(244, 247, 247);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        border-bottom: 15px;
+    }
+
+    .comics {
+        border-radius: 15px;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    input {
+        border-radius: 15px;
+        background-color: black;
+        color: rgb(247, 247, 247);
+        text-decoration: none;
+        text-align: center;
+    }
+
+    .pub {
+        background-color: hsl(0, 0%, 0%);
+        color: rgb(247, 247, 247);
+        text-align: center;
+        border-radius: 25px;
+    }
+</style>
+<p>Muchas Gracias al impulsar este proyecto con sus donaciones y repsuestas y usos soy Mati creador de 9 años en html y
+    css Gracias.</p>
+<hr>
+<a href="">Nostros</a>
+<hr>
+<a href="">Donar</a>
+<hr>
+<a href="" id="cheese">Importante Queso</a>
+
+</html>
