@@ -21,148 +21,122 @@
     </form>
 
     <div id="contenedor-comics" class="comics"></div>
-    <button id="btn-cargar-mas" style="display: block; margin: 20px auto; padding: 10px 20px; background-color: #000; color: #fff; border: none; border-radius: 20px; cursor: pointer;">Cargar más cómics</button>
     <script type="module">
-       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-// Agregamos startAfter para saber desde dónde continuar cargando
-import { getFirestore, collection, addDoc, getDocs, orderBy, query, doc, deleteDoc, limit, startAfter } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, orderBy, query, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyDZ2lPeBSmQx4h1UBglIE2Ake8JBHsD0yU",
-    authDomain: "youfri-a016f.firebaseapp.com",
-    projectId: "youfri-a016f",
-    storageBucket: "youfri-a016f.firebasestorage.app",
-    messagingSenderId: "197362593914",
-    appId: "1:197362593914:web:b38eb22895a3a9943e0bc3"
-};
+        const firebaseConfig = {
+            apiKey: "AIzaSyDZ2lPeBSmQx4h1UBglIE2Ake8JBHsD0yU",
+            authDomain: "youfri-a016f.firebaseapp.com",
+            projectId: "youfri-a016f",
+            storageBucket: "youfri-a016f.firebasestorage.app",
+            messagingSenderId: "197362593914",
+            appId: "1:197362593914:web:b38eb22895a3a9943e0bc3"
+        };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-// Variables para controlar la paginación
-let ultimoDoc = null; 
+        // FORMULARIO MANUAL
+        document.getElementById('formulario-comic').addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-// FORMULARIO MANUAL
-document.getElementById('formulario-comic').addEventListener('submit', async (e) => {
-    e.preventDefault();
+            const titulo = document.getElementById('titulo').value;
+            const autor = document.getElementById('autor').value;
+            const sinopsis = document.getElementById('sinopsis').value;
+            const imagenUrl = document.getElementById('ImagenURI').value;
+            const password = document.getElementById('password').value; // <-- CAPTURA LA CONTRASEÑA DEL INPUT
 
-    const titulo = document.getElementById('titulo').value;
-    const autor = document.getElementById('autor').value;
-    const sinopsis = document.getElementById('sinopsis').value;
-    const imagenUrl = document.getElementById('ImagenURI').value;
-    const password = document.getElementById('password').value; 
-
-    try {
-        await addDoc(collection(db, "comics"), {
-            titulo,
-            autor,
-            sinopsis,
-            imagenUrl,
-            password, 
-            fecha: new Date()
+            try {
+                await addDoc(collection(db, "comics"), {
+                    titulo,
+                    autor,
+                    sinopsis,
+                    imagenUrl,
+                    password, // <-- GUARDA LA CONTRASEÑA EN FIREBASE
+                    fecha: new Date()
+                });
+                alert("¡Cómic publicado!");
+                document.getElementById('formulario-comic').reset();
+                mostrarComics();
+            } catch (error) {
+                console.error("Error al guardar: ", error);
+            }
         });
-        alert("¡Cómic publicado!");
-        document.getElementById('formulario-comic').reset();
-        // Al publicar uno nuevo, reiniciamos la lista para ver el más reciente arriba
-        ultimoDoc = null;
-        document.getElementById('contenedor-comics').innerHTML = "";
-        mostrarComics();
-    } catch (error) {
-        console.error("Error al guardar: ", error);
-    }
-});
 
-// FUNCIÓN PARA CARGAR LOS PRIMEROS 20 CÓMICS
-async function mostrarComics() {
-    const contenedor = document.getElementById('contenedor-comics');
-    if (!contenedor) return;
+        // UNA SOLA FUNCIÓN MOSTRAR COMICS LIMPIA Y CORREGIDA
+        async function mostrarComics() {
+            const contenedor = document.getElementById('contenedor-comics');
+            if (!contenedor) return;
 
-    try {
-        // Le quitamos el orderBy para que Firebase no se trabe sin el índice
-const q = query(collection(db, "comics"), limit(20));
-        const querySnapshot = await getDocs(q);
-        contenedor.innerHTML = "";
+            try {
+                const q = query(collection(db, "comics"), orderBy("fecha", "desc"));
+                const querySnapshot = await getDocs(q);
+                contenedor.innerHTML = "";
 
-        // Guardamos el último documento de esta tanda de 20
-        ultimoDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+                querySnapshot.forEach((docSnap) => {
+                    const datos = docSnap.data();
+                    const idDoc = docSnap.id; // Captura el ID único para poder borrarlo
 
-        querySnapshot.forEach((docSnap) => {
-            dibujarTarjeta(docSnap);
-        });
-    } catch (error) {
-        console.error("Error al cargar: ", error);
-    }
-}
-
-// FUNCIÓN PARA CARGAR LOS SIGUIENTES 20 CÓMICS (BOTÓN)
-async function cargarMasComics() {
-    if (!ultimoDoc) {
-        alert("¡Ya no hay más cómics que cargar!");
-        return;
-    }
-
-    try {
-        // Usamos startAfter para cargar a partir del último que ya vimos
-        const q = query(collection(db, "comics"), orderBy("fecha", "desc"), startAfter(ultimoDoc), limit(20));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            alert("¡Llegaste al final del lore de YouFri!");
-            return;
+                    contenedor.innerHTML += `
+                        <div class="card-comic" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; max-width: 300px; display: inline-block; margin-right: 15px; vertical-align: top;">
+                            <img src="${datos.imagenUrl}" alt="Portada" style="max-width: 100%; height: auto; border-radius: 4px;">
+                            <h3>${datos.titulo}</h3>
+                            <p><strong>Por:</strong> ${datos.autor}</p>
+                            <p>${datos.sinopsis}</p>
+                            <button onclick="eliminarComic('${idDoc}', '${datos.password}')" style="background-color: red; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 5px 10px; margin-top: 10px; width: 100%;">Eliminar</button>
+                        </div>
+                    `;
+                });
+            } catch (error) {
+                console.error("Error al cargar: ", error);
+            }
         }
 
-        // Actualizamos el último documento con el de la nueva tanda
-        ultimoDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+        // Ejecuta la función al cargar la página
+        mostrarComics();
 
-        querySnapshot.forEach((docSnap) => {
-            dibujarTarjeta(docSnap);
+        // LÓGICA AUTOMÁTICA PARA EL BOTÓN DE QUESO
+        document.getElementById('cheese').addEventListener('click', async (e) => {
+            e.preventDefault(); 
+
+            try {
+                await addDoc(collection(db, "comics"), {
+                    titulo: "Queso",
+                    autor: "Bot Quesero",
+                    sinopsis: "queso",
+                    imagenUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8d/Emmental_cheese_on_white_background.jpg",
+                    password: "admin", // Contraseña por defecto para el queso rápido
+                    fecha: new Date()
+                });
+                alert("¡Se publicó un Queso automáticamente! 🧀");
+                mostrarComics(); 
+            } catch (error) {
+                console.error("Error al publicar queso: ", error);
+            }
         });
-    } catch (error) {
-        console.error("Error al cargar más: ", error);
-    }
-}
 
-// FUNCIÓN AUXILIAR PARA DIBUJAR LA TARJETA EN EL HTML
-function dibujarTarjeta(docSnap) {
-    const contenedor = document.getElementById('contenedor-comics');
-    const datos = docSnap.data();
-    const idDoc = docSnap.id; 
+        // FUNCIÓN GLOBAL PARA ELIMINAR EL CÓMIC CON CONTRASEÑA
+        window.eliminarComic = async function (id, passwordCorrecto) {
+            // Si el cómic es viejo y no tiene contraseña, usa "admin" por defecto
+            const passReal = passwordCorrecto && passwordCorrecto !== "undefined" ? passwordCorrecto : "admin";
+            
+            const passUsuario = prompt("Introduce la contraseña para eliminar este cómic:");
 
-    contenedor.innerHTML += `
-        <div class="card-comic" style="border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; max-width: 300px; display: inline-block; margin-right: 15px; vertical-align: top;">
-            <img src="${datos.imagenUrl}" alt="Portada" style="max-width: 100%; height: auto; border-radius: 4px;">
-            <h3>${datos.titulo}</h3>
-            <p><strong>Por:</strong> ${datos.autor}</p>
-            <p>${datos.sinopsis}</p>
-            <button onclick="eliminarComic('${idDoc}', '${datos.password}')" style="background-color: red; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 5px 10px; margin-top: 10px; width: 100%;">Eliminar</button>
-        </div>
-    `;
-}
+            if (passUsuario === null) return; // Si el usuario cancela, no hace nada
 
-// ASIGNAR EVENTO AL BOTÓN DE CARGAR MÁS
-document.getElementById('btn-cargar-mas').addEventListener('click', cargarMasComics);
-
-// Ejecuta la función al cargar la página
-mostrarComics();
-
-// LÓGICA AUTOMÁTICA PARA EL BOTÓN DE QUESO
-document.getElementById('cheese').addEventListener('click', async (e) => {
-    e.preventDefault(); 
-
-    try {
-        await addDoc(collection(db, "comics"), {
-            titulo: "Queso",
-            autor: "Bot Quesero",
-            sinopsis: "queso",
-            imagenUrl: "https://upload.wikimedia.org/wikipedia/commons/8/8d/Emmental_cheese_on_white_background.jpg",
-            password: "admin", 
-            fecha: new Date()
-        });
-        alert("¡Se publicó un Queso automáticamente! 🧀");
-        ultimoDoc = null;
-        document.getElementById('contenedor-comics').innerHTML = "";
-        mostrarComics(); 
-    } catch (error) {
+            if (passUsuario === passReal) {
+                try {
+                    await deleteDoc(doc(db, "comics", id));
+                    alert("¡Cómic eliminado correctamente! 🗑️");
+                    mostrarComics(); // Recarga la pantalla
+                } catch (error) {
+                    console.error("Error al eliminar: ", error);
+                }
+            } else {
+                alert("❌ Contraseña incorrecta. No puedes borrar este cómic.");
+            }
+        };
     </script>
 </body>
 <style>
@@ -198,12 +172,6 @@ document.getElementById('cheese').addEventListener('click', async (e) => {
         text-align: center;
         border-radius: 25px;
     }
-    #contenedor-comics {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px; /* Espacio de separación entre tarjetas */
-    align-items: start; /* Alinea todas las tarjetas al techo de su fila */
-}
 </style>
 <p>Muchas Gracias al impulsar este proyecto con sus donaciones y repsuestas y usos soy Mati creador de 9 años en html y
     css Gracias.</p>
