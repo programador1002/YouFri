@@ -78,7 +78,8 @@ async function mostrarComics() {
     if (!contenedor) return;
 
     try {
-        const q = query(collection(db, "comics"), orderBy("fecha", "desc"), limit(20));
+        // Le quitamos el orderBy para que Firebase no se trabe sin el índice
+const q = query(collection(db, "comics"), limit(20));
         const querySnapshot = await getDocs(q);
         contenedor.innerHTML = "";
 
